@@ -613,7 +613,7 @@ def evaluate_agentic_prolog(model, dataset, max_steps: int = 8):
 if __name__ == "__main__":
     wandb.init(
         project="gsm8k-prolog-prover-new-evaluation",
-        name="sp-struct-rwd1-full-agentic-internal-mmlu-stem",
+        name="sp-struct-rwd1-full-agentic-internal",
         settings=wandb.Settings(start_method="thread")
     )
     # # load your model, val_dataset here...
