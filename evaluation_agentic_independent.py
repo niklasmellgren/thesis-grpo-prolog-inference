@@ -729,4 +729,3 @@ if __name__ == "__main__":
     )
     art.add_file(str(log_path))
     wandb.run.log_artifact(art)
-
