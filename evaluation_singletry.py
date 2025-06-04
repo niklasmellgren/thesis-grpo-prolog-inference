@@ -1,5 +1,5 @@
 """
-Module for evaluating Prolog code generation models on GSM8K dataset (Single-Try inference).
+Module for evaluating Prolog code generation models (Single-Try inference).
 
 This script provides utilities to:
 - Convert conversation messages to text prompts.
