@@ -755,7 +755,7 @@ def evaluate_agentic_prolog(model, dataset, max_steps: int = 20) -> Dict[str, fl
         full_ok = strict and struct_ok
 
         sem_pct = 0.0
-        ref = sample.get("answer", "").strip()
+        ref = string(sample.get("answer", "")).strip()
         if code and ref:
             m = re.search(r"<answer>(.*?)</answer>", ref, re.DOTALL)
             ref_code = m.group(1).strip() if m else ref
