@@ -37,7 +37,7 @@ from vllm import SamplingParams
 from sentence_transformers import SentenceTransformer, util
 from datasets import load_dataset
 
-# sp-struct
+# SP-Struct + agentic addition (You have one tool: <tools> ...)
 tool_spec_prompt = """
 You are a specialized Prolog code–generating assistant.
 You have one tool:
