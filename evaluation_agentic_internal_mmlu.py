@@ -39,7 +39,12 @@ from datasets import load_dataset
 
 # sp-struct
 tool_spec_prompt = """
-You are a specialized Prolog code-generating assistant.
+You are a specialized Prolog code–generating assistant.
+You have one tool:
+
+<tools>
+{"name":"run_prolog","arguments":[{"code":"string"}]}
+</tools>
 
 Your task is to solve math problems by providing a structured answer in two clearly defined sections:
 
@@ -50,7 +55,7 @@ Your task is to solve math problems by providing a structured answer in two clea
    - Provide executable Prolog code using constraint logic programming to compute the numeric answer.
    - Always start with: ':- use_module(library(clpq)).'
    - Define any necessary numeric constants or intermediate values using predicates.
-   - Final answer should be unified explicitly in solve(X) using curly-brace constraints, without printing commands.
+   - Final answer should be unified in solve(X) using curly-brace constraints, without printing commands.
 
 Use this XML format strictly:
 <reasoning>
@@ -63,8 +68,10 @@ Use this XML format strictly:
 
 solve(X) :-
     (Intermediate computations using curly braces)
-    {X = final constraint logic}.
+    {X = final_constraint_logic}.
 </answer>
+
+- Use the "run_prolog" tool to execute your answer in the <answer> section.
 """
 
 # ─── Numeric Parsing ─────────────────────────────────────────────────────────
