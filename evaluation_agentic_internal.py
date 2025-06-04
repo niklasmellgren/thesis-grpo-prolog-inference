@@ -1,5 +1,5 @@
 """
-Module for evaluating Prolog code generation models (Agentic-Internal inference).
+Module for evaluating an agentic-internal Prolog code–generating approach on multiple-choice questions.
 
 This script provides utilities to:
 - Extract user prompts from dataset samples.
@@ -393,7 +393,7 @@ def agentic_loop(model: FastLanguageModel,
             conv = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_query},
-                {"role": "system", "content": "Please provide a concise solution—context was too long."}
+                {"role": "system", "content": "Please provide a concise solution - previous attempts used too many tokens."}
             ]
             print_tokens("pre-prune", conv)
 
@@ -408,7 +408,7 @@ def agentic_loop(model: FastLanguageModel,
             empty_count += 1
             print(f">>> Empty generation detected (#{empty_count})")
             if empty_count >= EMPTY_RETRIES:
-                print(f">>> Too many empty generations—aborting")
+                print(f">>> Too many empty generations ({empty_count}) - aborting this problem")
                 return None, None, step + 1
 
             if empty_count >= 2:
@@ -426,10 +426,10 @@ def agentic_loop(model: FastLanguageModel,
             else:
                 # Slightly increase temperature and add a hint
                 cur_temp = min(cur_temp * SHAKE_FACTOR * 1.2, CAP_TEMP)
-                print(f">>> Increasing temperature to {cur_temp:.2f} and retrying")
+                print(f">>> Increasing temperature to {cur_temp:.2f} and trying again")
                 conv.append({
                     "role": "system",
-                    "content": "The previous generation was empty. Please provide a full solution."
+                    "content": "The previous generation was empty. Please try again with a complete solution."
                 })
             continue
 
@@ -445,7 +445,7 @@ def agentic_loop(model: FastLanguageModel,
             conv = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_query},
-                {"role": "system", "content": "Context was too long—please retry concisely."}
+                {"role": "system", "content": "Please retry - context was too long."}
             ]
             print_tokens("post-prune", conv)
 
@@ -478,11 +478,13 @@ def agentic_loop(model: FastLanguageModel,
                 # After ESC_AFTER duplicates, force a skeleton answer
                 reminder = (
                     "SYSTEM REMINDER:\n"
-                    f"You have repeated the same <answer> {ESC_AFTER} times without success.\n"
-                    "Please emit ONLY the skeleton with the correct number:\n"
+                    f"You have repeated the same <answer> {ESC_AFTER} times and it "
+                    "still fails.  Emit ONLY this skeleton with the **correct "
+                    "number**:\n"
                     "<answer>\n"
                     ":- use_module(library(clpq)).\n\n"
-                    "solve(X) :- {X = NUMBER}.\n"
+                    "solve(X) :-\n"
+                    "    {X = NUMBER}.\n"
                     "</answer>\n"
                     "<tool_call>{\"name\":\"run_prolog\",\"arguments\":"
                     "{\"code\":\"...\"}}</tool_call>"
@@ -495,7 +497,7 @@ def agentic_loop(model: FastLanguageModel,
                 conv = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_query},
-                    {"role": "system", "content": "You're repeating the same wrong solution. Start fresh."}
+                    {"role": "system", "content": "You've been generating the same incorrect solution repeatedly. Please start with a different approach."}
                 ]
                 cur_temp = BASE_TEMP
                 seen_answers.clear()
@@ -526,7 +528,7 @@ def agentic_loop(model: FastLanguageModel,
             conv = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_query},
-                {"role": "system", "content": "Previous attempts produced invalid results. Please try fresh."}
+                {"role": "system", "content": "Previous attempts produced invalid results. Please try a completely fresh approach."}
             ]
             cur_temp = BASE_TEMP
             seen_answers.clear()
@@ -538,17 +540,20 @@ def agentic_loop(model: FastLanguageModel,
         # Otherwise, inject concise feedback and retry
         feedback = (
             "The code failed to produce a numeric result.\n\n"
-            "Let's fix it:\n"
+            "Let's fix it:\n\n"
             "1. Reflect on what went wrong.\n"
-            "2. Recalculate.\n"
+            "2. Recalculate\n"
             "3. Adjust your answer to:\n"
             "<answer>\n"
             ":- use_module(library(clpq)).\n\n"
-            "solve(X) :- {X = final_number}.\n"
+            "solve(X) :-\n"
+            "    {X = final_number}.\n"
             "</answer>\n\n"
             "<tool_call>{\n"
             '  "name": "run_prolog",\n'
-            '  "arguments": {"code": ":- use_module(library(clpq)).\\n\\nsolve(X) :- {X = final_number}."}\n'
+            '  "arguments": {\n'
+            '    "code": ":- use_module(library(clpq)).\\n\\nsolve(X) :- {X = final_number}."\n'
+            "  }\n"
             "}</tool_call>"
         )
         print_tokens("pre-feedback", conv)
