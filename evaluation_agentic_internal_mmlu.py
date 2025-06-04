@@ -248,8 +248,7 @@ def extract_tool_calls(text: str) -> List[dict]:
 # ─── Token-Counting Helpers ──────────────────────────────────────────────────
 # NOTE: TOKENIZER must be defined before using these helpers (e.g., HF tokenizer).
 
-TOKENIZER = None  # to be assigned externally to a HuggingFace tokenizer instance
-TOKEN_BUDGET = 2048  # will be overwritten by calculate_optimal_token_budget()
+TOKENIZER = tokenizer  # to be assigned externally to a HuggingFace tokenizer instance
 
 def _tok_count(text: str) -> int:
     """
