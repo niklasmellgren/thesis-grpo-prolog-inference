@@ -13,20 +13,17 @@ from datasets import load_dataset
 from typing import Optional, List, Tuple
 import io, sys, contextlib, pathlib, datetime
 
+import tiktoken 
+
 # Accepts 12   -7   3.14159   +0.5
 # Rejects 611r5   12+   1,234   2e3   etc.
 NUMERIC_RE = re.compile(r'^[+-]?\d+(?:\.\d+)?$')
-
-COMMA_NUMERIC_RE = re.compile(r'^[+-]?\d{1,3}(?:,\d{3})*(?:\.\d+)?$')
 
 def _parse_numeric(text: str) -> str | None:
     s = text.strip()
     if s.endswith('.'):
         s = s[:-1]
-    # strip thousands commas for testing
-    s_nocomma = s.replace(",", "")
-    return s if (NUMERIC_RE.match(s_nocomma) or COMMA_NUMERIC_RE.match(s)) else None
-
+    return s if NUMERIC_RE.match(s) else None
 
 # ─── Prolog Structure Checker ───────────────────────────────────────────────
 def analyze_prolog_structure_subprocess(prolog_code: str) -> dict:
@@ -73,7 +70,7 @@ def run_prolog(code: str, timeout: int = 5) -> str:
     # Check for recursion risks and log warning
     if detect_recursion_risks(code):
         print(">>> WARNING: Potential infinite recursion detected in Prolog code")
-
+    
     # Add necessary module import if not present
     if ":- use_module(library(clpq))" not in code:
         code = ":- use_module(library(clpq)).\n\n" + code
@@ -89,7 +86,7 @@ def run_prolog(code: str, timeout: int = 5) -> str:
     tmp = f"temp_{uuid.uuid4().hex}.pl"
     with open(tmp, "w") as f:
         f.write(code)
-
+    
     try:
         # Run with timeout but handle it gracefully
         r = subprocess.run(
@@ -98,7 +95,7 @@ def run_prolog(code: str, timeout: int = 5) -> str:
         )
         out = r.stdout.strip()
         result = out.splitlines()[-1] if out else None
-
+        
         # Remove all special handling for float results - just return as is
         return result
     except subprocess.TimeoutExpired:
@@ -119,17 +116,10 @@ def extract_tool_calls(text: str):
         except: pass
     return calls
 
-# keep a global reference for the helpers below
-TOKENIZER = tokenizer
-
-def _tok_count(text: str) -> int:
-    # plain text → number of tokens, no BOS/EOS
-    return len(TOKENIZER(text, add_special_tokens=False)["input_ids"])
-
-def _prompt_tokens(msgs) -> int:
-    # formatted prompt → number of tokens
-    prompt = "\n\n".join(f"({m['role'].upper()}) {m['content']}" for m in msgs)
-    return _tok_count(prompt)
+ENC = tiktoken.get_encoding("cl100k_base")
+def _tok_count(text: str)->int:
+    return len(ENC.encode(text, allowed_special="all", disallowed_special=()))
+def _prompt_tokens(msgs): return sum(_tok_count(m["content"]) for m in msgs)
 
 def print_tokens(stage: str, conv: List[dict]):
     used = _prompt_tokens(conv)
@@ -172,13 +162,13 @@ def agentic_loop(model, system_prompt, user_query, max_steps=20):
 
     for step in range(max_steps):
         params=SamplingParams(
-            temperature=cur_temp,
+            temperature=cur_temp, 
             top_p=0.95,
-            max_tokens=512,
+            max_tokens=512, 
             stop=["</answer>"],
             include_stop_str_in_output=True,
         )
-
+        
         # Add pre-generation token budget check
         # Check if we're close to the limit BEFORE generating
         if _prompt_tokens(conv) > TOKEN_BUDGET * 0.95:  # 95% of budget threshold
@@ -193,16 +183,16 @@ def agentic_loop(model, system_prompt, user_query, max_steps=20):
         print_tokens("pre-gen", conv)
         out=model.fast_generate(prompt,params)[0].outputs[0].text
         print(f"--- TURN {step+1} ---\n{out}\n")
-
+        
         # Modified empty generation handling
         if not out.strip():
             empty_count += 1
             print(f">>> Empty generation detected (#{empty_count})")
-
+            
             if empty_count >= EMPTY_RETRIES:
                 print(f">>> Too many empty generations ({empty_count}) - aborting this problem")
                 return None, None, step+1
-
+            
             # Reset context after 3 consecutive empty generations
             if empty_count >= 2:
                 print(">>> Multiple empty generations detected - resetting context")
@@ -217,12 +207,12 @@ def agentic_loop(model, system_prompt, user_query, max_steps=20):
                 # Normal temperature increase for occasional empty generation
                 cur_temp = min(cur_temp * SHAKE_FACTOR * 1.2, CAP_TEMP)
                 print(f">>> Increasing temperature to {cur_temp:.2f} and trying again")
-
+                
                 # Add a system message to encourage better response
                 conv.append({"role": "system", "content": "The previous generation was empty. Please try again with a complete solution."})
-
+            
             continue  # Skip to next iteration without adding empty response
-
+            
         # Reset empty counter when we get a non-empty response
         empty_count = 0
 
@@ -305,7 +295,7 @@ def agentic_loop(model, system_prompt, user_query, max_steps=20):
             numeric_fails = 1
         else:
             numeric_fails += 1
-
+            
         # Reset context after 3 non-numeric results
         if numeric_fails >= 3:
             print(">>> Multiple non-numeric results detected - resetting context")
@@ -337,12 +327,12 @@ def agentic_loop(model, system_prompt, user_query, max_steps=20):
             "  }\n"
             "}</tool_call>"
         )
-
+        
         print_tokens("pre-feedback", conv)
-
+    
         print("\n>>> FEEDBACK INJECTED:\n" + feedback_msg + "\n")     # announce in console
         conv.append({"role":"user","content": feedback_msg})
-
+        
         print_tokens("post-feedback", conv)
 
     raise RuntimeError("Exhausted max_steps")
@@ -365,16 +355,16 @@ You have one tool:
 {"name":"run_prolog","arguments":[{"code":"string"}]}
 </tools>
 
-Your task is to choose the correct option index for a multiple-choice STEM question, and present your work in two clearly defined sections:
+Your task is to solve math problems by providing a structured answer in two clearly defined sections:
 
 1. <reasoning>
-   - Provide a clear, concise step-by-step explanation of how you determine which option is correct.
-   - Refer to the correct option by its zero-based index.
+   - Provide a clear, concise step-by-step explanation of how you arrive at the solution.
 
 2. <answer>
-   - Provide executable Prolog code using constraint logic programming to compute the index of the correct choice.
+   - Provide executable Prolog code using constraint logic programming to compute the numeric answer.
    - Always start with: ':- use_module(library(clpq)).'
-   - Final answer should be unified in solve(X) using a single curly-brace constraint that sets X to the chosen index.
+   - Define any necessary numeric constants or intermediate values using predicates.
+   - Final answer should be unified in solve(X) using curly-brace constraints, without printing commands.
 
 Use this XML format strictly:
 <reasoning>
@@ -383,13 +373,15 @@ Use this XML format strictly:
 <answer>
 :- use_module(library(clpq)).
 
+(Any predicates/constants defined here)
+
 solve(X) :-
-    {X = correct_index}.
+    (Intermediate computations using curly braces)
+    {X = final_constraint_logic}.
 </answer>
 
 - Use the "run_prolog" tool to execute your answer in the <answer> section.
 """
-
 
 def calculate_optimal_token_budget(model_max_tokens=2048, safety_margin_pct=5, max_samples=10):
     """
@@ -408,63 +400,63 @@ def calculate_optimal_token_budget(model_max_tokens=2048, safety_margin_pct=5, m
         print(question)
         print("-" * 40)
     print("=== END VERIFICATION DISPLAY ===\n")
-
+    
     # Get samples for actual token budget calculation
     print(f"=== COLLECTING SAMPLES FOR TOKEN BUDGET CALCULATION ===")
     print(f"Using max_samples={max_samples}")
-
+    
     sample_problems = []
     for idx, sample in enumerate(val_dataset):
         if idx >= max_samples:
             break
         question = extract_problem(sample)
         sample_problems.append(question)
-
+    
     # Safety check - we must have at least one sample from the dataset
     if not sample_problems:
         raise ValueError("No samples found in dataset for token budget calculation")
-
+    
     print(f"Successfully collected {len(sample_problems)} samples")
     print("=" * 40)
-
+    
     # Collect overhead factors from multiple samples
     overhead_factors = []
-
+    
     print("\n=== TOKEN BUDGET ANALYSIS ===")
     print(f"Analyzing {len(sample_problems)} samples from dataset")
-
+    
     for i, problem in enumerate(sample_problems):
         # Create sample conversation with this problem
         sample_conv = [
             {"role": "system", "content": tool_spec_prompt},
             {"role": "user", "content": f"Please solve this problem: {problem}"}
         ]
-
+        
         # Add a plausible assistant response (simplified for measurement)
         sample_conv.append({"role": "assistant", "content": f"<reasoning>\nAnalyzing the problem...\n</reasoning>\n<answer>\n:- use_module(library(clpq)).\n\nsolve(X) :-\n    {{X = 42}}.\n</answer>"})
-
+        
         # Measure raw vs formatted tokens
         raw_tokens = _prompt_tokens(sample_conv)
         formatted_prompt = "\n\n".join(f"({m['role'].upper()}) {m['content']}" for m in sample_conv)
         formatted_tokens = _tok_count(formatted_prompt)
-
+        
         # Calculate overhead
         factor = formatted_tokens / raw_tokens
         overhead_factors.append(factor)
-
+        
         print(f"Sample #{i+1} overhead factor: {factor:.4f}x ({raw_tokens} → {formatted_tokens} tokens)")
-
+    
     # Statistical analysis of overhead factors
     min_factor = min(overhead_factors)
     max_factor = max(overhead_factors)
     avg_factor = sum(overhead_factors) / len(overhead_factors)
-
+    
     # Use a conservative approach - the maximum observed overhead plus safety margin
     safe_factor = max_factor * (1 + safety_margin_pct/100)
-
+    
     # Calculate optimal budget
     optimal_budget = int(model_max_tokens / safe_factor)
-
+    
     print(f"\nFormatting overhead statistics:")
     print(f"  - Minimum: {min_factor:.4f}x")
     print(f"  - Average: {avg_factor:.4f}x")
@@ -474,7 +466,7 @@ def calculate_optimal_token_budget(model_max_tokens=2048, safety_margin_pct=5, m
     print(f"Optimal token budget: {optimal_budget}")
     print(f"This provides {((model_max_tokens / optimal_budget) - 1) * 100:.1f}% headroom")
     print("============================\n")
-
+    
     return optimal_budget
 
 # Usage: Change this value to use more or fewer samples
@@ -494,7 +486,7 @@ def evaluate_agentic_prolog(model, dataset, max_steps: int = 8):
     overall_start = time.time()
 
     for idx, sample in enumerate(tqdm(dataset, desc="Evaluating"), start=1):
-        gold = float(str(sample["numerical_result"]).replace(",", ""))
+        gold = float(sample["numerical_result"])
         question = extract_problem(sample)
         # ─── NEW: echo the question text ───────────────────────────
         print("\n" + "#"*70)
@@ -529,7 +521,7 @@ def evaluate_agentic_prolog(model, dataset, max_steps: int = 8):
 
         # ─── ensure sem_pct is always defined ───
         sem_pct = 0.0                              # <<< add this line
-        ref = str(sample.get("answer", "")).strip()
+        ref = sample.get("answer", "").strip()
         if code and ref:
             m = re.search(r"<answer>(.*?)</answer>", ref, re.DOTALL)
             ref_code = m.group(1).strip() if m else ref
@@ -613,7 +605,7 @@ def evaluate_agentic_prolog(model, dataset, max_steps: int = 8):
 if __name__ == "__main__":
     wandb.init(
         project="gsm8k-prolog-prover-new-evaluation",
-        name="sp-struct-rwd1-full-agentic-internal",
+        name="sp-struct-rwd1-agentic-internal",
         settings=wandb.Settings(start_method="thread")
     )
     # # load your model, val_dataset here...
@@ -646,7 +638,7 @@ if __name__ == "__main__":
     with log_path.open("w", encoding="utf-8") as fp, \
         contextlib.redirect_stdout(Tee(fp, sys.stdout)), \
         contextlib.redirect_stderr(Tee(fp, sys.stderr)):
-
+        
         final_metrics = evaluate_agentic_prolog(
             model, val_dataset, max_steps=20
         )
