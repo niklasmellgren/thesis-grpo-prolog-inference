@@ -546,6 +546,8 @@ def evaluate_prolog_generation(
 
     for idx, sample in enumerate(tqdm(dataset, desc="Evaluating")):
         sample_index = idx + 1
+        has_reference = False
+        
         prompt_text = conversation_to_prompt(sample["prompt"])
         print(f"\n[Sample {sample_index}] Flattened Prompt:\n{prompt_text}")
 
