@@ -1,5 +1,5 @@
 """
-Module for evaluating an agentic-internal Prolog code–generating approach on multiple-choice questions.
+Module for evaluating Prolog code generation models (Agentic-Internal inference).
 
 This script provides utilities to:
 - Extract user prompts from dataset samples.
