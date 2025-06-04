@@ -39,7 +39,6 @@ import sys
 import contextlib
 import pathlib
 import datetime
-import tiktoken
 
 # SP-Struct + agentic addition (You have one tool: <tools> ...)
 tool_spec_prompt = """
