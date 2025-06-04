@@ -25,12 +25,6 @@ from vllm import SamplingParams
 
 from unsloth import FastLanguageModel, is_bfloat16_supported
 
-# Regex to ensure the string is a valid simple arithmetic expression.
-# Matches only digits (\d), whitespace (\s), plus (+), minus (-), multiply (*), divide (/),
-# decimal point (.), and parentheses (() and )). This prevents evaluating any unexpected
-# or unsafe characters when using eval.
-ARITHMETIC_PATTERN = re.compile(r'^[\d\s+\-*/().]+$')
-
 
 def conversation_to_prompt(messages: list[dict]) -> str:
     """
@@ -80,7 +74,6 @@ def extract_xml_answer(text: str) -> str | None:
         or None if no complete <answer> block is found.
     """
     try:
-        # Truncate at <|endoftext|> if present
         eot_index = text.find("<|endoftext|>")
         truncated = text[:eot_index] if eot_index != -1 else text
 
@@ -100,9 +93,6 @@ def extract_xml_answer(text: str) -> str | None:
 def execute_prolog_code_subprocess(prolog_code: str, timeout: int = 5) -> str | None:
     """
     Write Prolog code to a temporary file and invoke SWI-Prolog to solve it.
-
-    The Prolog file is created, then SWI-Prolog is called with:
-        swipl -q -f temp_file -g "solve(X), writeln(X), halt"
 
     Args:
         prolog_code: String containing Prolog predicates and queries.
@@ -152,10 +142,6 @@ def analyze_prolog_structure_subprocess(prolog_code: str) -> dict[str, int]:
 
     Writes the given Prolog code to a temp file, then calls:
         swipl -q -f prolog_helpers.pl -g "analyze_code('temp_file', PredCount, ConstCount), halt"
-
-    The helper script should output lines like:
-        PREDICATE_COUNT: <n>
-        CONSTRAINT_COUNT: <m>
 
     Args:
         prolog_code: String containing Prolog code.
@@ -211,8 +197,6 @@ def check_structure_correctness(prolog_code: str) -> bool:
     """
     Check if Prolog code has at least one predicate (besides solve/1) and one constraint.
 
-    Uses analyze_prolog_structure_subprocess to retrieve counts.
-
     Args:
         prolog_code: String containing Prolog code.
 
@@ -238,14 +222,8 @@ def semantic_similarity_reward(
     """
     Compute semantic similarity reward between generated Prolog code and reference code.
 
-    - Extracts Prolog code from completions using extract_xml_answer.
-    - Embeds model code and reference code with SentenceTransformer.
-    - Computes cosine similarity.
-    - Computes predicate name overlap ratio.
-    - Final reward = (cosine_sim + predicate_overlap) / 2.0
-
     Args:
-        completions: List of lists containing dicts with "content" keys. Each completion is [[{"content": text}, ...]].
+        completions: List of lists containing dicts with "content" keys.
         answer: List of reference Prolog code strings.
         semantic_model: Pre-loaded SentenceTransformer model.
 
@@ -273,7 +251,6 @@ def semantic_similarity_reward(
 
             reward_val = (cosine_sim + pred_overlap) / 2.0
             rewards.append(reward_val)
-
         except Exception as e:
             print(f"Error in semantic similarity: {e}")
             rewards.append(0.0)
@@ -291,15 +268,6 @@ def correctness_reward_func(
     """
     Compute numeric correctness reward by executing Prolog code and comparing results.
 
-    - Extracts code via extract_xml_answer.
-    - Executes code via execute_prolog_code_subprocess.
-    - Converts output to float and compares against gold numerical result.
-
-    Reward scheme:
-        - Exact match: 2.0
-        - Incorrect numeric: 1.0
-        - Missing or error: 0.5
-
     Args:
         prompts: List of message sequences (not used except for logging first prompt).
         completions: List of lists containing dicts with "content" keys.
@@ -313,7 +281,6 @@ def correctness_reward_func(
     extracted_responses = [extract_xml_answer(r) for r in responses]
     correct_values = numerical_result
 
-    # Logging for the first sample (optional)
     if responses:
         question = prompts[0][-1]["content"] if (prompts and prompts[0]) else "N/A"
         print("-" * 20)
@@ -358,7 +325,6 @@ def correctness_reward_func(
             else:
                 rewards.append(1.0)
                 print("Partial Reward: Numeric result incorrect.")
-
         except Exception as e:
             rewards.append(0.5)
             print(f"Error converting output to float: {e}\nModel: {mv}, Correct: {cv}")
@@ -373,12 +339,6 @@ def prolog_structure_reward_func(
     """
     Compute a reward based on Prolog code structure:
 
-    - Parses <answer>...</answer> to extract code.
-    - Uses analyze_prolog_structure_subprocess to count predicates and constraints.
-    - Score = min(pred_count * 0.25, 0.75) + min(const_count * 0.3, 0.9)
-    - Penalizes hard-coded solve/1 clauses by multiplying by 0.2.
-    - Caps final score to [0.0, 2.0].
-
     Args:
         completions: List of lists containing dicts with "content" keys.
 
@@ -386,7 +346,6 @@ def prolog_structure_reward_func(
         List of float scores per completion.
     """
     rewards: list[float] = []
-
     for comp in completions:
         text = comp[0]["content"]
         start_idx = text.find("<answer>")
@@ -401,10 +360,7 @@ def prolog_structure_reward_func(
         pred_count = analysis.get("predicate_count", 0)
         const_count = analysis.get("constraint_count", 0)
 
-        # Base score from counts
         score = min(pred_count * 0.25, 0.75) + min(const_count * 0.3, 0.9)
-
-        # Penalize hard-coded facts in solve/1
         hardcode_pattern = r"solve\([^)]*\)\s*:-.*(\b\w+\s*=\s*\d+|{\s*\w+\s*=\s*\d+\s*})"
         if re.search(hardcode_pattern, extracted_code, flags=re.DOTALL):
             score *= 0.2
@@ -419,10 +375,6 @@ def prolog_syntax_reward_func(completions: list[list[dict]], **kwargs) -> list[f
     """
     Reward based on presence of Prolog syntax keywords or constructs.
 
-    - Looks for tokens: ":-", "solve(", "use_module", "clpq", or trailing ".".
-
-    Each occurrence adds 0.2 up to a cap of 1.0.
-
     Args:
         completions: List of lists containing dicts with "content" keys.
 
@@ -431,13 +383,11 @@ def prolog_syntax_reward_func(completions: list[list[dict]], **kwargs) -> list[f
     """
     pattern = r"(?::-|solve\s*\(|use_module|clpq|\.\s*$)"
     rewards: list[float] = []
-
     for comp in completions:
         text = comp[0]["content"]
         hits = re.findall(pattern, text, flags=re.MULTILINE)
         score = min(len(hits) * 0.2, 1.0)
         rewards.append(score)
-
     return rewards
 
 
@@ -453,21 +403,13 @@ def strict_format_reward_func(completions: list[list[dict]], **kwargs) -> list[f
     </answer>
 
     Full match yields 0.5, else 0.0.
-
-    Args:
-        completions: List of lists containing dicts with "content" keys.
-
-    Returns:
-        List of 0.5 or 0.0 per completion.
     """
     pattern = r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n.*?\n</answer>\n$"
     rewards: list[float] = []
-
     for comp in completions:
         text = comp[0]["content"]
         match = re.match(pattern, text, flags=re.DOTALL)
         rewards.append(0.5 if match else 0.0)
-
     return rewards
 
 
@@ -476,21 +418,13 @@ def soft_format_reward_func(completions: list[list[dict]], **kwargs) -> list[flo
     Reward if the response contains <reasoning>...</reasoning> followed by <answer>...</answer>.
 
     Partial match yields 0.5, else 0.0.
-
-    Args:
-        completions: List of lists containing dicts with "content" keys.
-
-    Returns:
-        List of 0.5 or 0.0 per completion.
     """
     pattern = r"<reasoning>.*?</reasoning>\s*<answer>.*?</answer>"
     rewards: list[float] = []
-
     for comp in completions:
         text = comp[0]["content"]
         match = re.search(pattern, text, flags=re.DOTALL)
         rewards.append(0.5 if match else 0.0)
-
     return rewards
 
 
@@ -505,43 +439,26 @@ def count_xml(text: str) -> float:
       - Exactly one "\n</answer>"
 
     Penalize small deviations in trailing text after </answer>.
-
-    Args:
-        text: Response string.
-
-    Returns:
-        Float score summing the above contributions.
     """
     count = 0.0
-
     if text.count("<reasoning>\n") == 1:
         count += 0.125
     if text.count("\n</reasoning>\n") == 1:
         count += 0.125
-
     if text.count("\n<answer>\n") == 1:
         count += 0.125
         remainder = text.split("\n</answer>\n")[-1]
         count -= len(remainder) * 0.001
-
     if text.count("\n</answer>") == 1:
         count += 0.125
-        # Penalize extra lines or characters after </answer>
         remainder = text.split("\n</answer>\n")[-1]
         count -= max(0, len(remainder) - 1) * 0.001
-
     return count
 
 
 def xmlcount_reward_func(completions: list[list[dict]], **kwargs) -> list[float]:
     """
     Reward based on count_xml metric for each completion.
-
-    Args:
-        completions: List of lists containing dicts with "content" keys.
-
-    Returns:
-        List of float XML count rewards.
     """
     contents = [comp[0]["content"] for comp in completions]
     return [count_xml(c) for c in contents]
@@ -554,15 +471,17 @@ def evaluate_prolog_generation(
     max_new_tokens: int = 1024,
 ) -> dict:
     """
-    Main evaluation loop for Prolog generation on a dataset.
+    Main evaluation loop for Prolog generation on a dataset (Single-Try inference).
 
     For each sample:
         1. Convert conversation to text prompt.
         2. Generate model output with Prolog code in XML format.
         3. Extract Prolog code and execute via SWI-Prolog.
-        4. Check numeric correctness (strict and arithmetic).
-        5. Check structural correctness.
-        6. Compute semantic similarity if reference exists.
+        4. Attempt to parse the Prolog output directly as a float:
+           - If parsing succeeds, mark numeric correctness.
+           - Otherwise, treat as failure.
+        5. Check structural correctness of the Prolog code.
+        6. Compute semantic similarity if a reference answer exists.
         7. Log per-sample and aggregate metrics to Weights & Biases.
 
     Args:
@@ -577,10 +496,8 @@ def evaluate_prolog_generation(
             - "timing": dict of average times (generation, prolog, validation).
             - "details": list of rows from the W&B results table.
     """
-    # Initialize semantic similarity model
     semantic_model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    # Metrics tracking
     metrics: dict[str, object] = {
         "total_samples": 0,
         "strict_correct": 0,
@@ -595,7 +512,6 @@ def evaluate_prolog_generation(
         "validation_times": [],
     }
 
-    # Prepare W&B results table
     results_table = wandb.Table(
         columns=[
             "Sample Index",
@@ -615,7 +531,6 @@ def evaluate_prolog_generation(
         ]
     )
 
-    # Sampling parameters for generation
     sampling_params = SamplingParams(
         temperature=0.2,
         top_p=0.95,
@@ -629,7 +544,6 @@ def evaluate_prolog_generation(
     for idx, sample in enumerate(tqdm(dataset, desc="Evaluating")):
         sample_index = idx + 1
 
-        # Initialize default values per sample
         prompt_text = ""
         model_text = ""
         prolog_code = ""
@@ -648,7 +562,6 @@ def evaluate_prolog_generation(
         prolog_exec_time = 0.0
         validation_time = 0.0
 
-        # Per-attempt info dictionary
         attempt_info: dict[str, object] = {
             "model_output": "",
             "extracted_code": "",
@@ -663,23 +576,20 @@ def evaluate_prolog_generation(
         }
 
         try:
-            # 1. Flatten prompt
             messages = sample["prompt"]
             prompt_text = conversation_to_prompt(messages)
             print(f"\n[Sample {sample_index}] Flattened Prompt:\n{prompt_text}")
 
-            # 2. Parse gold numerical value (if any)
             gold_str = sample.get("numerical_result", "")
             if gold_str:
                 try:
                     gold_val = float(gold_str)
                 except ValueError:
                     print(
-                        f"Warning: Could not convert gold numerical result '{gold_str}' "
-                        f"to float for sample {sample_index}"
+                        f"Warning: Could not convert gold numerical result "
+                        f"'{gold_str}' to float for sample {sample_index}"
                     )
 
-            # 3. Generate model output
             gen_start = time.time()
             output_data = model.fast_generate(prompt_text, sampling_params)
             generation_time = time.time() - gen_start
@@ -688,7 +598,6 @@ def evaluate_prolog_generation(
             model_text = output_data[0].outputs[0].text
             attempt_info["model_output"] = model_text
 
-            # 4. Extract Prolog code
             prolog_code = extract_xml_answer(model_text)
             attempt_info["extracted_code"] = prolog_code or "No code extracted"
 
@@ -696,7 +605,6 @@ def evaluate_prolog_generation(
                 attempt_info["reason_for_failure"] = "No Prolog code extracted"
                 print(f"Sample {sample_index}: No Prolog code extracted.")
             else:
-                # 5. Execute Prolog code
                 prolog_start = time.time()
                 final_line = execute_prolog_code_subprocess(prolog_code)
                 prolog_exec_time = time.time() - prolog_start
@@ -706,11 +614,9 @@ def evaluate_prolog_generation(
                 attempt_info["is_valid_prolog"] = final_line is not None
                 attempt_info["prolog_execution_time"] = prolog_exec_time
 
-                # 6. Check structural correctness
                 structure_valid = check_structure_correctness(prolog_code)
                 attempt_info["structure_valid"] = structure_valid
 
-                # 7. Check numeric output and correctness
                 if final_line:
                     try:
                         num_val = float(final_line)
@@ -718,12 +624,9 @@ def evaluate_prolog_generation(
                         if gold_val is not None:
                             is_strict = abs(num_val - gold_val) < 1e-6
                             attempt_info["is_correct_number"] = is_strict
-                        success = True
                         print(f"Sample {sample_index}: Numeric output: {final_line}")
                     except ValueError:
-                        attempt_info["reason_for_failure"] = (
-                            "Prolog output is not a valid number"
-                        )
+                        attempt_info["reason_for_failure"] = "Prolog output is not a valid number"
                         print(
                             f"Sample {sample_index}: Prolog code did not yield a "
                             f"numeric result ('{final_line}')."
@@ -734,23 +637,13 @@ def evaluate_prolog_generation(
                 else:
                     attempt_info["reason_for_failure"] = "Prolog execution did not return a result"
 
-                # 8. Validate arithmetic evaluation if strict fails
                 valid_start = time.time()
-                if not is_strict and final_line and ARITHMETIC_PATTERN.match(final_line.strip()):
-                    try:
-                        eval_val = float(eval(final_line.strip()))
-                        is_arithmetic = abs(eval_val - gold_val) < 1e-6 if gold_val is not None else False
-                        if not is_arithmetic:
-                            error_type = "Arithmetic result incorrect"
-                    except Exception as e:
-                        error_type = f"Arithmetic conversion error: {e}"
                 validation_time = time.time() - valid_start
                 metrics["validation_times"].append(validation_time)
 
                 is_structure = structure_valid
                 attempt_info["structure_valid"] = is_structure
 
-                # 9. Compute semantic similarity (if reference answer exists)
                 reference_answer = [sample.get("answer", "")]
                 has_reference = bool(reference_answer[0].strip())
                 if final_line and has_reference:
@@ -766,10 +659,8 @@ def evaluate_prolog_generation(
                         print(f"Semantic similarity error: {e}")
                         raw_semantic = 0.0
 
-                # 10. Determine if fully correct (strict/arithmetic + structure)
                 is_full_correct = (is_strict or is_arithmetic) and is_structure
 
-                # Print sample summary
                 print(f"\n--- Sample {sample_index} Summary ---")
                 if final_line:
                     print("-" * 40)
@@ -800,7 +691,6 @@ def evaluate_prolog_generation(
                 "reason_for_failure": error_type,
             }
 
-        # Log per-sample results to W&B table
         results_table.add_data(
             sample_index,
             prompt_text,
@@ -820,7 +710,6 @@ def evaluate_prolog_generation(
             str(attempt_info["reason_for_failure"]) if attempt_info["reason_for_failure"] else "",
         )
 
-        # Update aggregate metrics
         metrics["total_samples"] += 1
         if is_strict:
             metrics["strict_correct"] += 1
@@ -836,7 +725,6 @@ def evaluate_prolog_generation(
             if raw_semantic >= 0.7:
                 metrics["total_semantic"] += 1
 
-        # Compute running accuracies
         total = metrics["total_samples"]
         accuracies = {
             "strict": (metrics["strict_correct"] / total * 100) if total > 0 else 0.0,
@@ -868,15 +756,11 @@ def evaluate_prolog_generation(
             step=sample_index,
         )
 
-    # End of dataset loop
     elapsed = time.time() - start_time
-
-    # Safety check
     if metrics["total_samples"] == 0:
         print("WARNING: No samples processed during evaluation")
         return {"accuracies": {}, "timing": {}, "details": []}
 
-    # Compute average times
     avg_times = {
         "generation": (
             sum(metrics["generation_times"]) / len(metrics["generation_times"])
@@ -895,7 +779,6 @@ def evaluate_prolog_generation(
         ),
     }
 
-    # Compute final accuracies
     total = metrics["total_samples"]
     final_accuracies = {
         "strict": (metrics["strict_correct"] / total * 100) if total > 0 else 0.0,
@@ -903,14 +786,9 @@ def evaluate_prolog_generation(
         "structure": (metrics["structure_correct"] / total * 100) if total > 0 else 0.0,
         "full_correct": (metrics["full_correct_count"] / total * 100) if total > 0 else 0.0,
     }
-    avg_semantic = (
-        metrics["semantic_sum"] / total if total > 0 else 0.0
-    )
-    final_semantic_accuracy = (
-        metrics["total_semantic"] / total * 100 if total > 0 else 0.0
-    )
+    avg_semantic = metrics["semantic_sum"] / total if total > 0 else 0.0
+    final_semantic_accuracy = (metrics["total_semantic"] / total * 100) if total > 0 else 0.0
 
-    # Log final results to W&B
     wandb.log(
         {
             "detailed_results": results_table,
@@ -939,7 +817,6 @@ def evaluate_prolog_generation(
         }
     )
 
-    # Print final summary to console
     print("\n" + "=" * 80)
     print(" EVALUATION COMPLETE ".center(80))
     print("=" * 80)
@@ -964,7 +841,7 @@ def evaluate_prolog_generation(
 if __name__ == "__main__":
     wandb.init(
         project="gsm8k-prolog-prover-new-evaluation",
-        name="sp-reflect-rwd1-singletry",
+        name="sp-reflect-rwd1-singletry-testnew",
         settings=wandb.Settings(start_method="thread"),
         config={"environment": "colab"},
     )
