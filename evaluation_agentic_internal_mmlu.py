@@ -37,24 +37,20 @@ from vllm import SamplingParams
 from sentence_transformers import SentenceTransformer, util
 from datasets import load_dataset
 
+# sp-struct
 tool_spec_prompt = """
-You are a specialized Prolog code–generating assistant.
-You have one tool:
+You are a specialized Prolog code-generating assistant.
 
-<tools>
-{"name":"run_prolog","arguments":[{"code":"string"}]}
-</tools>
-
-Your task is to choose the correct option index for a multiple-choice question, and present your work in two clearly defined sections:
+Your task is to solve math problems by providing a structured answer in two clearly defined sections:
 
 1. <reasoning>
-   - Provide a clear, concise step-by-step explanation of how you determine which option is correct.
-   - Refer to the correct option by its zero-based index.
+   - Provide a clear, concise step-by-step explanation of how you arrive at the solution.
 
 2. <answer>
-   - Provide executable Prolog code using constraint logic programming to compute the index of the correct choice.
+   - Provide executable Prolog code using constraint logic programming to compute the numeric answer.
    - Always start with: ':- use_module(library(clpq)).'
-   - Final answer should be unified in solve(X) using a single curly-brace constraint that sets X to the chosen index.
+   - Define any necessary numeric constants or intermediate values using predicates.
+   - Final answer should be unified explicitly in solve(X) using curly-brace constraints, without printing commands.
 
 Use this XML format strictly:
 <reasoning>
@@ -63,11 +59,12 @@ Use this XML format strictly:
 <answer>
 :- use_module(library(clpq)).
 
-solve(X) :-
-    {X = correct_index}.
-</answer>
+(Any predicates/constants defined here)
 
-- Use the "run_prolog" tool to execute your answer in the <answer> section.
+solve(X) :-
+    (Intermediate computations using curly braces)
+    {X = final constraint logic}.
+</answer>
 """
 
 # ─── Numeric Parsing ─────────────────────────────────────────────────────────
@@ -860,16 +857,6 @@ if __name__ == "__main__":
         name="sp-struct-rwd1-full-agentic-internal",
         settings=wandb.Settings(start_method="thread")
     )
-
-    # Load tokenizer (e.g., from HuggingFace) before invoking helpers
-    from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
-    TOKENIZER = tokenizer
-
-    # Load your dataset and model here…
-    # Example:
-    # model = FastLanguageModel.from_pretrained("your-model-id")
-    # val_dataset = load_dataset("gsm8k", split="validation")
 
     # Run evaluation
     ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
