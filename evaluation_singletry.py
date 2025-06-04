@@ -543,7 +543,8 @@ def evaluate_prolog_generation(
 
     for idx, sample in enumerate(tqdm(dataset, desc="Evaluating")):
         sample_index = idx + 1
-
+        has_reference = False
+        
         prompt_text = ""
         model_text = ""
         prolog_code = ""
