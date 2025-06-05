@@ -2,4 +2,4 @@ This repository contains the code for my 2025 master's thesis in Data Science â€
 
 **Thesis title:**  
 *Reinforcement Fine-Tuning Large Language Models to Use Prolog as a Tool*
-- Niklas Mellgren
+Author: Niklas Mellgren
