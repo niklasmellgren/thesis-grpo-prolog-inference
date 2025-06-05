@@ -716,7 +716,6 @@ def evaluate_agentic_prolog(model: FastLanguageModel,
     for idx, sample in enumerate(tqdm(dataset, desc="Evaluating"), start=1):
         gold = float(str(sample["numerical_result"]).replace(",", ""))
         question = extract_problem(sample)
-        has_reference = False
 
         print("\n" + "#" * 70)
         print(f"QUESTION {idx}: {question}")
