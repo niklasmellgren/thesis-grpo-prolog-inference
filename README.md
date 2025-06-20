@@ -1,7 +1,7 @@
 This repository contains the code for Niklas Mellgren's 2025 master's thesis in Data Science – ICT Systems at the University of Southern Denmark (SDU).
 
 ### **Thesis title**  
-**[Reinforcement Fine-Tuning Large Language Models to Use Prolog as a Tool (PDF)](./thesis/Masters_Thesis_Niklas_Mellgren.pdf)**  
+**[Reinforcement Fine-Tuning Large Language Models to Use Prolog as a Tool](./thesis/Masters_Thesis_Niklas_Mellgren.pdf)**  
 *Awarded the highest grade (12) at the University of Southern Denmark*
 
 ### **Abstract**
