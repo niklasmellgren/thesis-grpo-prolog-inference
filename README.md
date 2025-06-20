@@ -7,6 +7,8 @@ This repository contains the code for Niklas Mellgren's 2025 master's thesis in 
 ### **Abstract**
 Using Group Relative Policy Optimization (GRPO), this project fine-tunes Qwen2.5-3B-Instruct on a merged and cleaned version of `openai/gsm8k` and `Thomas-X-Yang/gsm8k-prolog`, resulting in the `niklasm222/gsm8k-prolog-prover` dataset.
 
+During preprocessing, I manually identified and corrected 15 errors across the original datasets — 14 in `openai/gsm8k` and 1 in `Thomas-X-Yang/gsm8k-prolog` — to ensure accurate alignment between the natural language questions, numeric answers, and symbolic Prolog representations.
+
 Three main experimental axes were explored:
 
 1. **Prompt structure**: From minimal XML formatting to reflexive, self-verifying scaffolds  
