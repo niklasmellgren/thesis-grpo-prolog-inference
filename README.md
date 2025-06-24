@@ -25,5 +25,5 @@ Three main experimental axes were explored:
 This project moves us closer to transparent and testable AI-reasoning by:
 
 - Converting instructional LLMs into reasoning models through reinforcement learning, using GRPO to enforce **explicit reasoning** in `<reasoning>` blocks and generate **symbolic Prolog programs** inside structured `<answer>` blocks
-- Leveraging **SWI-Prolog** not only as a static verifier, but also as an **interactive tool**, invoked via function-calling — exploring how lightweight AI agents can reason, self-repair, and validate their own output in a dialogue loop
+- Leveraging **SWI-Prolog** not only as a static verifier, but also as an interactive tool, invoked via function-calling — exploring how lightweight **AI agents** can reason, self-repair, and validate their own output in a dialogue loop
 - Reinforcing behavior that leads to reasoning and answers that are **verifiable, falsifiable, and logically grounded**
