@@ -16,7 +16,7 @@ Three main experimental axes were explored:
 3. **Inference protocol**: Including single-shot, best-of-N multiple-try, and two agentic modes where Prolog is used as a tool inside dialogue (internal) or across fresh sessions (independent)
 
 ![Plot 1](images/rwd1_correct_1.png)
-*Figure 1: Correctness reward progression during training across different system prompts under reward_suite_1. The LLMs `<answer>` block is executed using SWI-Prolog, and the numeric output is compared to the gold label. Exact matches receive a score of 2.0, incorrect but numeric outputs earn 1.0, and any runnable attempt - even with unbound variables or failures - earns 0.5.*
+*Figure 1: Correctness reward progression during training across different system prompts under reward_suite_1. The LLMs `<answer>` block is executed using SWI-Prolog, and the numeric output is compared to a gold label. Exact matches receive a score of 2.0, incorrect but numeric outputs earn 1.0, and any runnable attempt - even with unbound variables or failures - earns 0.5.*
 
 ### Key findings
 - Joint tuning of prompt, reward, and inference shapes the structure and quality of generated Prolog programs
