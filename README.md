@@ -16,8 +16,8 @@ Three main experimental axes were explored:
 3. **Inference protocol**: Including single-shot, best-of-N multiple-try, and two agentic modes where Prolog is used as a tool inside dialogue (internal) or across fresh sessions (independent)
 
 <p align="center">
-  <img src="assets/rwd1_correct_1.png" style="width:45%; margin-right:5px;">
-  <img src="assets/sp-struct_rwd1_prolog_accuracy.png" style="width:45%;">
+  <img src="assets/rwd1_correct_1.png" width="45%">
+  <img src="assets/sp-struct_rwd1_prolog_accuracy.png" width="45%">
 </p>
 
 ### Key findings
