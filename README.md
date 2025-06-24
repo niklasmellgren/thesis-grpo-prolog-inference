@@ -11,7 +11,7 @@ During preprocessing, I identified and manually corrected 15 errors across the o
 
 Three main experimental axes were explored:
 
-1. **Prompt structure**: From minimal XML formatting to reflexive, self-verifying scaffolds  
+1. **Prompt structure**: From minimal XML formatting to structured, declarative and reflexive, self-verifying scaffolds  
 2. **Reward composition**: Combining execution correctness, syntax, semantic similarity, structural constraints, and curriculum shaping in three different reward suites
 3. **Inference protocol**: Including single-shot, best-of-N multiple-try, and two agentic modes where Prolog is used as a tool inside dialogue (internal) or across fresh sessions (independent)
 
