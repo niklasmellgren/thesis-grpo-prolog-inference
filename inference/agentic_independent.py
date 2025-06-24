@@ -40,7 +40,7 @@ import contextlib
 import pathlib
 import datetime
 
-# SP-Struct + agentic addition
+# SP-Struct + Agentic addition
 #
 # Agentic addition =
 # You have one tool:
