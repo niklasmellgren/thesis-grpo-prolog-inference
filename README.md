@@ -15,10 +15,8 @@ Three main experimental axes were explored:
 2. **Reward composition**: Combining execution correctness, syntax, semantic similarity, structural constraints, and curriculum shaping in three different reward suites
 3. **Inference protocol**: Including single-shot, best-of-N multiple-try, and two agentic modes where Prolog is used as a tool inside dialogue (internal) or across fresh sessions (independent)
 
-<p align="center">
-  <img src="assets/rwd1_correct_1.png" width="45%">
-  <img src="assets/sp-struct_rwd1_prolog_accuracy.png" width="45%">
-</p>
+![Plot 1](assets/rwd1_correct_1.png)
+![Plot 2](assets/sp-struct_rwd1_prolog_accuracy.png)
 
 ### Key findings
 - Joint tuning of prompt, reward, and inference shapes the structure and quality of generated Prolog programs
