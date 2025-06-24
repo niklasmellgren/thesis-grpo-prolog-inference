@@ -37,7 +37,7 @@ from vllm import SamplingParams
 from sentence_transformers import SentenceTransformer, util
 from datasets import load_dataset
 
-# SP-Struct + agentic addition
+# SP-Struct + Agentic addition
 #
 # Agentic addition =
 # You have one tool:
