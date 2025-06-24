@@ -37,7 +37,16 @@ from vllm import SamplingParams
 from sentence_transformers import SentenceTransformer, util
 from datasets import load_dataset
 
-# SP-Struct + agentic addition (You have one tool: <tools> ...)
+# SP-Struct + agentic addition
+#
+# Agentic addition =
+# You have one tool:
+# <tools>
+# {"name":"run_prolog","arguments":[{"code":"string"}]}
+# </tools>
+# +
+# - Use the "run_prolog" tool to execute your answer in the <answer> section.
+
 tool_spec_prompt = """
 You are a specialized Prolog code–generating assistant.
 You have one tool:
